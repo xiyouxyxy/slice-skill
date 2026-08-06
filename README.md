@@ -18,13 +18,17 @@
 
 ## 安装
 
-本仓库是一个**跨 agent 通用**的「切片计划」skill（不绑定任何特定产品）。按你使用的 agent 选一种方式：
+仓库本身就是一个**跨 agent 通用**的「切片计划」skill（不绑定任何特定产品）。**核心内容就一份**：`SKILL.md` + `references/` + `scripts/`，按你使用的 agent 复制到对应的加载位置即可：
 
-- **Claude Code**：把 `portable/claude-code/` 整体复制到 `~/.claude/skills/slice/`（全局）或 `<项目>/.claude/skills/slice/`（项目级），重启 Claude Code 即可用「帮我把 X 切成每天计划」触发。
-- **Codex**：把 `portable/codex-slice.md` 的内容**追加**到 `~/.codex/AGENTS.md` 或项目根 `AGENTS.md`，Codex 会读取 `portable/claude-code/SKILL.md` 执行。
-- **其它支持 skills 目录的 agent**：复制仓库根目录的 `SKILL.md` + `references/` + `scripts/` 到该 agent 的 skills 加载位置即可。
+| Agent | 安装方式 |
+|-------|---------|
+| **通用（任何读 markdown skill 的 agent）** | 把 `SKILL.md` + `references/` + `scripts/` 整体复制到该 agent 的 skills 加载目录 |
+| **Claude Code** | 复制到 `~/.claude/skills/slice/`（全局）或 `<项目>/.claude/skills/slice/`（项目级），重启 Claude Code |
+| **Codex** | 把 `SKILL.md` 的正文**追加**到 `~/.codex/AGENTS.md` 或项目根 `AGENTS.md`（Codex 没有 skill 目录机制，按指令文件读取） |
 
 安装后，在对话中说「帮我把 X 切成每天计划」「把这门课排进日程（X 月 X 日前学完）」即可触发。
+
+> 计划文件默认落在 `<workspace>/.slice/plans/<goal-slug>.md`，可改为任意你喜欢的路径。
 
 ## 用法示例
 - 目标型：`/slice 三个月学会 Python 做数据分析`（不填每日时长 → 按 3 个月窗口反推）
@@ -66,13 +70,6 @@ slice/
 ```
 
 > 说明：当前排程逻辑由 `SKILL.md` 中的工作流说明驱动（AI 现推）。如需确定性、可复现的排程引擎，可后续把排程算法提取为 `scripts/` 下的正式脚本。
-
-## 跨 agent 通用说明
-
-- 本仓库不绑定任何特定 agent，核心工作流（`SKILL.md`）与脚本（`scripts/`）在根目录与 `portable/claude-code/` 中共用同一份逻辑，修改一处即可同步。
-- 计划文件默认落在 `<workspace>/.slice/plans/<goal-slug>.md`，可改为任意你喜欢的路径。
-- 每日打卡：支持定时的 agent（如 Claude Code `/cron`、系统定时任务）可自动提醒；无定时能力的 agent（如 Codex）请每天手动触发步骤 9。
-- 脚本零依赖（仅 Python 标准库），任何装有 Python 的环境都能跑。
 
 ## License
 MIT — 见 [LICENSE](LICENSE)。
