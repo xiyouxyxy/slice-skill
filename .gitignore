@@ -1,0 +1,15 @@
+# WorkBuddy 本地数据（不是 skill 的一部分，勿提交）
+.workbuddy/
+
+# 打包 / 构建产物
+dist/
+
+# 测试与生成的产物
+*.ics
+_gen_plan.py
+learn-python*
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.swp
