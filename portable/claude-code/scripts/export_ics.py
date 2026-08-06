@@ -29,7 +29,7 @@ def build_ics(events: list, cal_name: str = "Slice Plan"):
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//WorkBuddy//Slice//CN",
+        "PRODID:-//Slice//Plan//CN",
         "CALSCALE:GREGORIAN",
         f"X-WR-CALNAME:{_escape(cal_name)}",
     ]
@@ -43,7 +43,7 @@ def build_ics(events: list, cal_name: str = "Slice Plan"):
         desc = _escape(str(ev.get("desc", "")))
         lines += [
             "BEGIN:VEVENT",
-            f"UID:slice-{i}-{date}@workbuddy",
+            f"UID:slice-{i}-{date}@slice",
             f"DTSTAMP:{now}",
             f"DTSTART;VALUE=DATE:{date}",
             f"SUMMARY:{title}",

@@ -1,6 +1,6 @@
 # 计划文件模板
 
-路径：`<workspace>/.workbuddy/slice/plans/<goal-slug>.md`
+路径：`<workspace>/.slice/plans/<goal-slug>.md`
 （`<goal-slug>` 用目标英文名/拼音短串，如 `learn-python`、`cfa-level1`、`write-book`）
 
 ## 元信息

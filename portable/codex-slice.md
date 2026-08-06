@@ -29,8 +29,8 @@ portable/claude-code/SKILL.md
   ```
 - 输入 `events.json` 为事件数组，每行形如 `{"date":"YYYY-MM-DD","title":"...","desc":"..."}`。
 
-## 与 WorkBuddy 版的差异（Codex 环境须知）
+## 与 Claude Code 版的差异（Codex 环境须知）
 
 - **无定时打卡**：Codex 没有自动化/定时能力。每日打卡请用户**每天手动**让 Codex 读取计划文件并执行 `SKILL.md` 步骤 9（标记完成度 + 落后自动重排）。
-- **计划落盘**：沿用 `SKILL.md` 里的 `.workbuddy/slice/plans/<goal-slug>.md`，或你喜欢的任意路径。
-- 其余工作流（WBS、双向排程、间隔复习、缓冲、导出选格式）与 WorkBuddy / Claude Code 版完全一致。
+- **计划落盘**：沿用 `SKILL.md` 里的 `.slice/plans/<goal-slug>.md`，或你喜欢的任意路径。
+- 其余工作流（WBS、双向排程、间隔复习、缓冲、导出选格式）与 Claude Code 版完全一致。

@@ -23,7 +23,7 @@
 
 **复习 / 缓冲**：每 5 天插 1 缓冲日；学习类内容按 +1 / +3 / +7 插入复习。
 
-**落档**：`.workbuddy/slice/plans/learn-python.md`，每日表含"新内容/复习/缓冲/微任务"四类。
+**落档**：`.slice/plans/learn-python.md`，每日表含"新内容/复习/缓冲/微任务"四类。
 
 ---
 
@@ -39,7 +39,7 @@
 
 **预警检查**：单日负荷 ≤ 2h，未超 2.5h 上限，不预警。
 
-**落档**：`.workbuddy/slice/plans/<course-slug>.md`。
+**落档**：`.slice/plans/<course-slug>.md`。
 
 ---
 
@@ -56,4 +56,4 @@
 
 **兜底**：若用户中途说"这周完全没写"，走步骤 9 重排（缓冲消化 → 顺延），落后超 30% 时提示延长截止日或提高投入。
 
-**落档**：`.workbuddy/slice/plans/write-book.md`，进度区追踪连续写作天数。
+**落档**：`.slice/plans/write-book.md`，进度区追踪连续写作天数。

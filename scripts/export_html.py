@@ -56,7 +56,7 @@ def build_html(events, title: str = "Slice Plan") -> str:
     p.append(f"<h1>{html.escape(title)} · 切片计划</h1>")
     p.append(
         f'<div class="meta">共 {len(days)} 天 · 生成于 '
-        f'{datetime.now().strftime("%Y-%m-%d %H:%M")} · 由 WorkBuddy slice skill 生成</div>'
+        f'{datetime.now().strftime("%Y-%m-%d %H:%M")} · 由 slice skill 生成</div>'
     )
     if not days:
         p.append("<p>没有可导出的任务。</p>")
