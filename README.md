@@ -48,8 +48,11 @@
 | **③ .ics 日历** | `export_ics.py` → `xxx.ics` | 要导入手机/桌面日历、每天弹提醒 | 日历 App（苹果日历 / Google 日历 / Outlook）导入 |
 | **④ 纯清单** | 计划文件里的勾选表 | 想手抄 / 贴到别处 | 同 Markdown |
 
-脚本调用（参数与上面的 JSON 事件文件一致，仅依赖 Python 标准库）：
+脚本调用（`plan_to_events.py` 仅依赖 Python 标准库；先把 `.md` 解析成 events JSON，再以它为输入导出）：
 ```
+# .md → events JSON（导出前置步骤，.md 是唯一真源，不必手写第二份 JSON）
+python scripts/plan_to_events.py --in plans/xxx.md --out plans/xxx-events.json
+
 # HTML 网页（带勾选框，浏览器打开）
 python scripts/export_html.py --in plans/xxx-events.json --out xxx.html --name "我的计划"
 
@@ -67,11 +70,12 @@ slice/
 │   ├── plan-template.md  # 计划文件标准格式
 │   └── examples.md       # 三类场景完整示例
 └── scripts/
-    ├── export_ics.py     # 计划 → .ics 日历导出
-    └── export_html.py    # 计划 → HTML 网页（带勾选框、可打印）
+    ├── plan_to_events.py # 计划 .md → events JSON（导出链路前置解析，.md 为唯一真源）
+    ├── export_ics.py     # events JSON → .ics 日历导出
+    └── export_html.py    # events JSON → HTML 网页（带勾选框、可打印）
 ```
 
-> 说明：当前排程逻辑由 `SKILL.md` 中的工作流说明驱动（AI 现推）。如需确定性、可复现的排程引擎，可后续把排程算法提取为 `scripts/` 下的正式脚本。
+> 说明：导出链路已确定性化（`.md` → `plan_to_events.py` → `export_*.py`）。排程 / 落后重排逻辑目前仍由 `SKILL.md` 工作流驱动（AI 现推）；如需确定性、可复现的排程引擎，可后续把排程算法提取为 `scripts/` 下的正式脚本。
 
 ## License
 MIT — 见 [LICENSE](LICENSE)。

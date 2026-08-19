@@ -48,6 +48,8 @@
 
 **落档**：`.slice/plans/learn-python.md`，每日表含"新内容/复习/缓冲/微任务"四类，每张任务都有三件套卡片。
 
+**日常使用（最高频）**：用户说「今天做什么 / 今日打卡」→ 按 SKILL 9.1 今日视图抽当日卡片、展示三件套 → 询问完成情况 → 按 9.2 回写状态 / 必要时重排。导出时先 `python scripts/plan_to_events.py --in learn-python.md --out learn-python-events.json`，再跑 `export_html.py` / `export_ics.py`。
+
 ---
 
 ## 示例 2：课程型（有提纲 + 有截止日 + 有每日时长）
