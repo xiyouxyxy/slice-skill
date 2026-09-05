@@ -1,14 +1,17 @@
 # WorkBuddy 本地数据（不是 skill 的一部分，勿提交）
 .workbuddy/
 
+# slice 生成的计划 / spec / 导出物 —— 一律不入库（无论放在哪）
+.slice/
+plans/
+*-events.json
+*-resched.md
+*-gen.md
+*.ics
+
 # 打包 / 构建产物
 dist/
 __pycache__/
-
-# 测试与生成的产物
-*.ics
-_gen_plan.py
-learn-python*
 
 # 系统 / 编辑器
 .DS_Store
