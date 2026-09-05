@@ -11,6 +11,9 @@
   "meta": {
     "title": "三个月学会用 Python 做数据分析",
     "type": "学习",                       # 学习 / 项目 / 习惯
+    "archetype": "coding",               # 可选；应试 exam / 编程 coding / 技能 skill /
+                                          # 知识 knowledge / 项目 project / 习惯 habit
+                                          # 不给则按 type 与关键词推断，拿不准建议显式给
     "base": "入门",                       # 零基础 / 入门 / 有基础 / 进阶
     "complete_def": "能独立完成…",         # 完成定义（写进交付卡）
     "daily_duration": 1.0,                # 小时，可省默认 1.0
@@ -63,6 +66,134 @@ KIND_LABEL = {"新内容": "新内容", "复习": "复习", "缓冲": "缓冲", 
 
 # 全局间隔复习的轮次标签（每 2 个里程碑插一次，覆盖此前全部里程碑）
 _GLOBAL_REVIEW_INTERVALS = [3, 7, 14, 30, 60]
+
+# ---------------------------------------------------------------------------
+# 目标原型（archetype）：决定话术与验收手段
+#
+# 不同原型的验收逻辑本质不同，不能用一套话术通吃：
+#   应试型 —— 验收是分数；**真题是消耗品**，复习要"复盘错题 + 换新题"，重做原题无效
+#   编程型 —— 验收是"能跑通的代码"
+#   技能型 —— 验收是"作品对比"，核心在手感（讲得清 ≠ 手会）
+#   知识型 —— 验收是"讲给别人听"
+#   项目型 —— 验收是"里程碑交付物"
+#   习惯型 —— 验收是"当日动作 + streak"
+# ---------------------------------------------------------------------------
+
+_ARCHETYPE_DEFAULT = {
+    "label": "通用",
+    "review_sub": "能不看资料说出 {name} 的核心点",
+    "review_accept": "重做关键验收项（{items}）",
+    "review_std": "达到首次同等标准",
+    "global_accept": "重做此前任意 2 个验收项",
+    "buffer_accept": "任选之前的 1 个子目标重新过一遍 / 重做 1 个验收项",
+    "buffer_recite": "任意 1 个旧难点，用自己的话讲清",
+}
+
+ARCHETYPE_PROFILE = {
+    "exam": {
+        "label": "应试型",
+        "review_sub": "能说出本阶段错题的共同失分原因",
+        "review_accept": "复盘本阶段错题（{items}）并补 1 套同等难度新题",
+        "review_std": "正确率不低于首次 / 达到目标分数段",
+        "global_accept": "复盘错题本 + 补 1 套跨阶段新题",
+        "buffer_accept": "整理错题本 / 补 1 组薄弱项专项练习",
+        "buffer_recite": "讲清 1 道曾经的错题当时为什么错",
+    },
+    "coding": {
+        "label": "编程 / 技术型",
+        "review_sub": "能不看资料写出 {name} 的核心代码结构",
+        "review_accept": "重跑关键代码（{items}）",
+        "review_std": "能跑通",
+        "global_accept": "重跑此前任意 2 段关键代码",
+        "buffer_accept": "任选之前的 1 个子目标重新过一遍 / 重跑 1 段代码",
+        "buffer_recite": "任意 1 个旧难点，讲清原理",
+    },
+    "skill": {
+        "label": "动手技能型",
+        "review_sub": "能不看资料做出 {name} 的核心动作",
+        "review_accept": "重做关键练习（{items}）",
+        "review_std": "与上次作品对比有可见进步",
+        "global_accept": "重做此前任意 2 个练习",
+        "buffer_accept": "补完未完成的作品 / 重做 1 个练习",
+        "buffer_recite": "讲清 1 个动作要领（为什么必须这样做）",
+    },
+    "knowledge": {
+        "label": "知识 / 理论型",
+        "review_sub": "能不看资料复述 {name} 的核心概念",
+        "review_accept": "不查资料复述关键概念（{items}）",
+        "review_std": "能用自己的话讲清",
+        "global_accept": "不查资料复述此前任意 2 个核心概念",
+        "buffer_accept": "任选之前的 1 个子目标重新过一遍 / 讲给他人听",
+        "buffer_recite": "任意 1 个旧难点，用自己的话讲清",
+    },
+    "project": {
+        "label": "项目型",
+        "review_sub": "能说清 {name} 交付物的完成标准",
+        "review_accept": "重做关键交付物（{items}）",
+        "review_std": "达到首次同等完成度",
+        "global_accept": "复此前任意 2 个交付物",
+        "buffer_accept": "推进 1 项未完成的交付物 / 重做 1 个验收项",
+        "buffer_recite": "任意 1 个旧难点，用自己的话讲清",
+    },
+    "habit": {
+        "label": "习惯型",
+        "review_sub": "能说清本阶段坚持得最好与最差的各 1 天",
+        "review_accept": "完成当日动作（{items}）",
+        "review_std": "完成即可，重点是不断链",
+        "global_accept": "连续完成当日动作，保住 streak",
+        "buffer_accept": "完成最低限度的当日动作（保住 streak）",
+        "buffer_recite": "讲清 1 个最容易打断你的场景与应对方式",
+    },
+}
+
+_TYPE_TO_ARCHETYPE = {
+    "应试": "exam", "考试": "exam", "备考": "exam",
+    "编程": "coding", "技术": "coding",
+    "技能": "skill", "手艺": "skill",
+    "知识": "knowledge", "理论": "knowledge",
+    "项目": "project",
+    "习惯": "habit",
+}
+
+# 关键词兜底：仅在既没显式给 archetype、type 又无法映射时使用
+_ARCHETYPE_KEYWORDS = [
+    ("exam", ("雅思", "托福", "考研", "考证", "考试", "真题", "分数线", "及格", "gre", "证书", "上岸")),
+    ("coding", ("python", "java", "javascript", "代码", "编程", "开发", "框架", "react", "前端", "后端", "算法", "github")),
+    ("skill", ("画", "弹", "吉他", "钢琴", "做菜", "烹饪", "烘焙", "瑜伽", "游泳", "摄影", "手工", "书法", "舞蹈")),
+]
+
+
+def _infer_archetype(spec: dict) -> str:
+    """推断目标原型；返回 "" 表示回落到通用模板。"""
+    meta = spec.get("meta", {}) or {}
+    a = str(meta.get("archetype") or "").strip().lower()
+    if a in ARCHETYPE_PROFILE:
+        return a
+    t = str(meta.get("type") or "").strip()
+    if t in _TYPE_TO_ARCHETYPE:
+        return _TYPE_TO_ARCHETYPE[t]
+    text = " ".join([
+        str(meta.get("title") or ""),
+        str(meta.get("complete_def") or ""),
+        " ".join(str(m.get("name") or "") for m in spec.get("milestones", []) or []),
+    ]).lower()
+    for key, words in _ARCHETYPE_KEYWORDS:
+        for w in words:
+            if w.lower() in text:
+                return key
+    return ""
+
+
+def _profile(archetype: str) -> dict:
+    return ARCHETYPE_PROFILE.get(archetype, _ARCHETYPE_DEFAULT)
+
+
+def _tpl(tpl: str, **kw) -> str:
+    """安全地格式化话术模板；模板里没有对应占位符时原样返回。"""
+    try:
+        return tpl.format(**kw)
+    except (KeyError, IndexError, ValueError):
+        return tpl
 
 
 def _cn_weekday(d: date) -> str:
@@ -119,6 +250,9 @@ def _over_budget_items(sched: list, daily_h):
         return []
     over = []
     for it in sched:
+        # 全真模考的时长 = 整场考试时长（如雅思笔试 2h45m），是固定开销而非学习投入，豁免
+        if "全真模考" in str(it.get("title", "")):
+            continue
         h = _to_hours(it.get("duration"))
         if h is not None and h > daily_h + 1e-9:
             over.append((it, h))
@@ -128,7 +262,7 @@ def _over_budget_items(sched: list, daily_h):
 # ---------------------------------------------------------------------------
 # 1. 把 spec 展开成有序的"日程项"列表（含自动生成的复习/缓冲）
 # ---------------------------------------------------------------------------
-def build_items(spec: dict) -> list:
+def build_items(spec: dict, archetype: str = "") -> list:
     """返回有序 item 列表：每个 item 是带渲染所需字段的 dict。"""
     milestones = spec.get("milestones", [])
     items = []
@@ -138,6 +272,8 @@ def build_items(spec: dict) -> list:
     for mi, m in enumerate(milestones):
         mname = m.get("name", f"M{mi + 1}")
         tasks = m.get("tasks", [])
+        # 只有大里程碑（>6 任务）才允许在内部插缓冲，其余一律等到里程碑边界
+        large = len(tasks) > 6
         for ti, t in enumerate(tasks):
             kind = t.get("kind", "新内容") or "新内容"
             items.append({
@@ -153,37 +289,47 @@ def build_items(spec: dict) -> list:
             # 计数新内容/工作类任务，满 5 插一个缓冲日（Step 6）
             if kind in ("新内容", "微任务"):
                 new_since_buffer += 1
-            if new_since_buffer >= 5:
-                items.append(_buffer_item())
+            is_last = (ti == len(tasks) - 1)
+            # 里程碑内部插缓冲：仅限大里程碑；技能型一律不在内部插
+            # （一幅画的"铺色 → 等干 → 刻画"不能被缓冲日拆到隔天）
+            if new_since_buffer >= 5 and not is_last and large and archetype != "skill":
+                items.append(_buffer_item(archetype))
                 new_since_buffer = 0
 
+        # 里程碑边界：统一在此结算，避免打断里程碑内部的连续任务
+        if new_since_buffer >= 5:
+            items.append(_buffer_item(archetype))
+            new_since_buffer = 0
+
         # 里程碑末 +1 复习（覆盖本里程碑）
-        items.append(_milestone_review(mname, mi, tasks))
+        items.append(_milestone_review(mname, mi, tasks, archetype))
 
         # 每 2 个里程碑插一次全局间隔复习（+3 / +7 / …）
         if (mi + 1) % 2 == 0 and global_review_idx < len(_GLOBAL_REVIEW_INTERVALS):
             span = _GLOBAL_REVIEW_INTERVALS[global_review_idx]
             global_review_idx += 1
-            items.append(_global_review(mi, span, milestones))
+            items.append(_global_review(mi, span, milestones, archetype))
 
     return items
 
 
-def _buffer_item() -> dict:
+def _buffer_item(archetype: str = "") -> dict:
+    prof = _profile(archetype)
     return {
         "kind": "缓冲",
         "title": "缓冲日",
         "duration": None,
         "sub": ["不强求，做完三件套之一即可"],
-        "accept": ["任选之前的 1 个子目标重新过一遍 / 重做 1 个验收项"],
-        "recite": ["任意 1 个旧难点，用自己的话讲清"],
+        "accept": [prof["buffer_accept"]],
+        "recite": [prof["buffer_recite"]],
         "milestone": "",
         "milestone_idx": -1,
     }
 
 
-def _milestone_review(mname: str, mi: int, tasks: list) -> dict:
-    # 从本里程碑任务里挑验收题，自动生成复习卡（无需 LLM 额外输入）
+def _milestone_review(mname: str, mi: int, tasks: list, archetype: str = "") -> dict:
+    # 从本里程碑任务里挑验收项，按原型套用对应话术（无需 LLM 额外输入）
+    prof = _profile(archetype)
     task_titles = [t.get("title", f"任务{i + 1}") for i, t in enumerate(tasks)]
     accepts = []
     for t in tasks:
@@ -194,13 +340,17 @@ def _milestone_review(mname: str, mi: int, tasks: list) -> dict:
     for t in tasks:
         recite_src += t.get("recite", [])[:1]
     recite = recite_src[:2] if recite_src else [f"口述『{mname} 中最易混的 1 个点』"]
+
+    items_txt = " / ".join(accepts) if accepts else "本里程碑重点项"
+    accept_txt = _tpl(prof["review_accept"], items=items_txt, name=mname)
+    if prof["review_std"]:
+        accept_txt = f"{accept_txt}，{prof['review_std']}"
     return {
         "kind": "复习",
         "title": f"复习 {mname} 全部（+1 间隔复习）",
         "duration": 0.5,
-        "sub": [f"能不看资料说出 {mname} 的核心点"],
-        "accept": [f"重做关键验收项（{(' / '.join(accepts)) if accepts else '本里程碑重点项'}），达到首次同等标准"]
-                  if accepts else ["重做本里程碑关键验收项，达到首次同等标准"],
+        "sub": [_tpl(prof["review_sub"], name=mname)],
+        "accept": [accept_txt],
         "recite": recite,
         "milestone": mname,
         "milestone_idx": mi,
@@ -209,14 +359,18 @@ def _milestone_review(mname: str, mi: int, tasks: list) -> dict:
     }
 
 
-def _global_review(upto_idx: int, span: int, milestones: list) -> dict:
+def _global_review(upto_idx: int, span: int, milestones: list, archetype: str = "") -> dict:
+    prof = _profile(archetype)
     covered = [m.get("name", f"M{i + 1}") for i, m in enumerate(milestones[:upto_idx + 1])]
+    accept_txt = prof["global_accept"]
+    if prof["review_std"]:
+        accept_txt = f"{accept_txt}，{prof['review_std']}"
     return {
         "kind": "复习",
         "title": f"全局复习（+{span} 间隔，覆盖 {' / '.join(covered)}）",
         "duration": 0.5,
         "sub": [f"能串联 {(' / '.join(covered))} 的主线"],
-        "accept": ["重做此前任意 2 个验收项，达到首次同等标准"],
+        "accept": [accept_txt],
         "recite": [f"口述『{covered[-1]} 与 {covered[0]} 的关系』"],
         "milestone": "",
         "milestone_idx": -1,
@@ -226,15 +380,23 @@ def _global_review(upto_idx: int, span: int, milestones: list) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 2. 排程：把有序 item 分配到可用日（Step 5）
+# 2. 排程：把有序 item 分配到可用日（Step 5）—— 双向适配
 # ---------------------------------------------------------------------------
-def schedule(items: list, start: date, available_days: str, target_date=None):
-    """返回带 date 字段的 item 列表。
+# 任务量少于可用日超过该比例时，视为"时间太多"，自动铺满到截止日
+_SPREAD_THRESHOLD = 1.3
+
+
+def schedule(items: list, start: date, available_days: str, target_date=None,
+             spec: dict = None, archetype: str = ""):
+    """返回 (sched, overload, fill_log)。
 
     - 默认：1 个 item / 可用日（符合默认节奏"每天 1 原子任务"）。
-    - 有 target_date 且可用日不足：在可用日里尽量均摊，单日可合并多项并标记 overload。
+    - 时间不够（可用日 < 任务数）：在可用日里尽量均摊，单日可合并多项并标记 overload。
+    - 时间太多（可用日 > 任务数 × 阈值 且给了 spec）：自动补充轮次铺满到截止日，
+      并把补了什么记入 fill_log（写进 .md 说明块 + 命令行打印）。
     """
     sched = []
+    fill_log = []
     d = _next_available(start, available_days)
     overload = False
 
@@ -263,13 +425,142 @@ def schedule(items: list, start: date, available_days: str, target_date=None):
                     sched[-1]["_merged_titles"] = titles
                 d = _advance(d, available_days)
                 i += per_day
-            return sched, overload
+            return sched, overload, fill_log
+
+        # 时间太多：任务量撑不满截止日前的可用日 → 自动补轮次铺满
+        if avail_count > len(items) * _SPREAD_THRESHOLD and spec:
+            items, fill_log = _spread_items(items, spec, archetype,
+                                            avail_count - len(items), tgt)
+
+    # 铺满模式（有截止日且补过轮次）：模考锁定到考前日期，其余任务均匀分布到截止日
+    if fill_log and target_date:
+        tgt = datetime.strptime(target_date, "%Y-%m-%d").date()
+        day_list = []
+        cur = _next_available(start, available_days)
+        while cur <= tgt:
+            if _is_available(cur, available_days):
+                day_list.append(cur)
+            cur += timedelta(days=1)
+
+        fixed_items = [it for it in items if it.get("_fixed_date")]
+        free_items = [it for it in items if not it.get("_fixed_date")]
+
+        used_days = set()
+        for it in fixed_items:
+            want = datetime.strptime(it["_fixed_date"], "%Y-%m-%d").date()
+            pos = next((x for x in day_list if x >= want and x not in used_days), None)
+            if pos is None:
+                pos = next((x for x in reversed(day_list) if x not in used_days), None)
+            if pos is not None:
+                e = dict(it, date=pos)
+                e.pop("_fixed_date", None)
+                sched.append(e)
+                used_days.add(pos)
+
+        remaining = [x for x in day_list if x not in used_days]
+        n = len(free_items)
+        if n:
+            if len(remaining) >= n:
+                # 均匀分布：任务铺满整个周期，空隙自然成为消化间隔
+                for k, it in enumerate(free_items):
+                    p = min(int(k * len(remaining) / n), len(remaining) - 1)
+                    sched.append(dict(it, date=remaining[p]))
+            else:
+                for k, it in enumerate(free_items):
+                    sched.append(dict(it, date=remaining[min(k, len(remaining) - 1)]))
+        sched.sort(key=lambda e: e["date"])
+        return sched, overload, fill_log
 
     # 常规：1 item / 可用日
     for it in items:
         sched.append(dict(it, date=d))
         d = _advance(d, available_days)
-    return sched, overload
+    return sched, overload, fill_log
+
+
+def _spread_items(items: list, spec: dict, archetype: str, need: int, target: date):
+    """时间太多时，用额外轮次把计划铺满到截止日。返回 (新 items, fill_log)。
+
+    补充优先级：
+      1. 应试型：考前 30 / 14 / 7 天各插 1 次全真模考（带固定日期，不参与顺序排）；
+      2. 追加更长间隔的复习轮次（+14 ~ +120），覆盖全部里程碑；
+      3. 少量综合演练 / 专项补弱轮次；
+      4. 仍有剩余 → 交给"均匀分布"消化（空隙即消化间隔）。
+    """
+    log = []
+    out = list(items)
+    milestones = spec.get("milestones", []) or []
+    if not milestones:
+        return items, log
+
+    added_exams = added_reviews = added_drills = 0
+
+    # 1) 应试型：模考节点（固定在考前日期）
+    if archetype == "exam":
+        for offset in (30, 14, 7):
+            if need <= 0:
+                break
+            it = _mock_exam_item(offset)
+            it["_fixed_date"] = (target - timedelta(days=offset)).isoformat()
+            out.append(it)
+            added_exams += 1
+            need -= 1
+
+    # 2) 追加间隔复习轮次
+    for span in (14, 21, 30, 45, 60, 90, 120):
+        if need <= 0:
+            break
+        out.append(_global_review(len(milestones) - 1, span, milestones, archetype))
+        added_reviews += 1
+        need -= 1
+
+    # 3) 少量综合演练（上限 8，其余交给均匀分布消化）
+    idx = 1
+    while need > 0 and idx <= 8:
+        out.append(_drill_item(idx, archetype))
+        added_drills += 1
+        need -= 1
+        idx += 1
+
+    if added_exams:
+        log.append(f"插入 {added_exams} 次全真模考（考前 30 / 14 / 7 天，固定日期）")
+    if added_reviews:
+        log.append(f"追加 {added_reviews} 个间隔复习轮次（+14 ~ +120 天，覆盖全部里程碑）")
+    if added_drills:
+        log.append(f"追加 {added_drills} 轮综合演练 / 专项补弱")
+    if need > 0:
+        log.append(f"其余 {need} 个空档日作为消化间隔（任务均匀分布到截止日）")
+
+    return out, log
+
+
+def _mock_exam_item(offset: int) -> dict:
+    return {
+        "kind": "复习",
+        "title": f"全真模考（考前 {offset} 天）",
+        "duration": 3.0,
+        "sub": ["按正式考试的时长与流程完整走一遍，中途不查任何资料"],
+        "accept": ["整套计时完成，记录总分与各单项分，并与上次模考对比"],
+        "recite": ["口述『本次模考暴露的 3 个最大失分点与下一步对策』"],
+        "milestone": "",
+        "milestone_idx": -1,
+        "review_src": [],
+    }
+
+
+def _drill_item(round_idx: int, archetype: str = "") -> dict:
+    prof = _profile(archetype)
+    return {
+        "kind": "复习",
+        "title": f"综合演练 / 专项补弱（第 {round_idx} 轮）",
+        "duration": 1.0,
+        "sub": ["挑目前最弱的 1 项集中练（先自评再动手）"],
+        "accept": [prof["buffer_accept"]],
+        "recite": [prof["buffer_recite"]],
+        "milestone": "",
+        "milestone_idx": -1,
+        "review_src": [],
+    }
 
 
 def _advance(d: date, available_days: str) -> date:
@@ -280,7 +571,7 @@ def _advance(d: date, available_days: str) -> date:
 # ---------------------------------------------------------------------------
 # 3. 渲染 .md（严格对齐 references/plan-template.md）
 # ---------------------------------------------------------------------------
-def render_md(spec: dict, sched: list, overload: bool) -> str:
+def render_md(spec: dict, sched: list, overload: bool, archetype: str = "", fill_log=None) -> str:
     meta = spec.get("meta", {})
     title = meta.get("title", "未命名计划")
     gtype = meta.get("type", "学习")
@@ -302,6 +593,8 @@ def render_md(spec: dict, sched: list, overload: bool) -> str:
     L.append("")
     L.append(f"- 目标：{title}")
     L.append(f"- 类型：{gtype}")
+    if archetype:
+        L.append(f"- 目标原型：{_profile(archetype)['label']}（{archetype}）")
     if target:
         L.append(f"- 截止日：{target}")
     else:
@@ -368,6 +661,12 @@ def render_md(spec: dict, sched: list, overload: bool) -> str:
 
     if overload:
         L.append("> ⚠️ **时间紧**：可用日不足以 1 任务/天摊开，已合并部分日期。建议延长截止日或提高每日投入。")
+        L.append("")
+
+    if fill_log:
+        L.append(f"> **已自动铺满到截止日**：原始任务量少于可用日，引擎自动补充了 {len(fill_log)} 项——")
+        for line in fill_log:
+            L.append(f"> - {line}")
         L.append("")
 
     over_budget = _over_budget_items(sched, _to_hours(daily))
@@ -466,10 +765,12 @@ def cmd_build(args):
     start_str = args.start or meta.get("start") or date.today().isoformat()
     start = datetime.strptime(start_str, "%Y-%m-%d").date()
     avail = meta.get("available_days", "weekdays+weekend")
+    archetype = _infer_archetype(spec)
 
-    items = build_items(spec)
-    sched, overload = schedule(items, start, avail, meta.get("target_date"))
-    md = render_md(spec, sched, overload)
+    items = build_items(spec, archetype)
+    sched, overload, fill_log = schedule(items, start, avail,
+                                         meta.get("target_date"), spec, archetype)
+    md = render_md(spec, sched, overload, archetype, fill_log)
 
     os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
@@ -479,6 +780,12 @@ def cmd_build(args):
     note = " ⚠️时间紧(已合并日期)" if overload else ""
     print(f"生成计划：{args.out}")
     print(f"  任务项 {len(sched)} 个，预计完成日 {finish}{note}")
+    if archetype:
+        print(f"  目标原型：{_profile(archetype)['label']}（{archetype}）")
+    if fill_log:
+        print(f"  已自动铺满到截止日，补充 {len(fill_log)} 项：")
+        for line in fill_log:
+            print(f"     + {line}")
     over = _over_budget_items(sched, _to_hours(meta.get("daily_duration", 1.0)))
     if over:
         print(f"  ⚠️ {len(over)} 个任务超出每日预算 {_fmt_duration(meta.get('daily_duration', 1.0))}：")
