@@ -162,7 +162,9 @@ description: 切片计划 / goal slicer — 把大目标、课程提纲或长期
 
 ### 7. 持久化计划文件
 
-在当前 workspace 下写入 `.slice/plans/<goal-slug>.md`，格式见 `references/plan-template.md`。若同目标已存在计划，先读旧计划再覆盖 / 续接。文件包含：元信息（目标卡片）、总览（里程碑 / 总工时 / 预计完成日）、每日计划表、进度区（留空待打卡更新）。
+1. **产出 spec JSON**：把步骤 3/4 的 WBS 结果（里程碑 → 任务三件套）写成本仓库约定的 spec JSON（结构见 `scripts/generate_plan.py` 文件头注释：meta / prerequisites / milestones[tasks]）。这是 LLM 负责的语义部分。
+2. **调用引擎渲染**：运行 `python scripts/generate_plan.py build --in <spec>.json --out <workspace>/.slice/plans/<goal-slug>.md [--start YYYY-MM-DD]`。引擎按步骤 5/6 自动完成**日期分配、缓冲、间隔复习、可用日过滤**，并严格按 `references/plan-template.md` 输出 `.md`，无需手写排程。
+3. 落盘路径：`.slice/plans/<goal-slug>.md`。若同目标已存在计划，先读旧计划再覆盖 / 续接。文件包含：元信息（目标卡片）、用户画像、前置条件、总览（里程碑 / 总工时 / 预计完成日）、每日计划表、任务卡片（三件套）、进度区（留空待打卡更新）。
 
 ### 8. 每日打卡提醒（可选）
 
@@ -225,6 +227,7 @@ description: 切片计划 / goal slicer — 把大目标、课程提纲或长期
 
 - `references/plan-template.md`：计划文件标准格式与填写示例（含三件套卡片）。
 - `references/examples.md`：目标型 / 课程型 / 长期任务型三个完整示例。
+- `scripts/generate_plan.py`：规划引擎（**确定性核心**）。`build` 子命令把 LLM 做完 WBS 的 spec JSON 按步骤 5/6/7 渲染成 `.md` 计划；`reschedule` 子命令实现步骤 9.2 的落后自动重排。仅依赖 Python 标准库。
 - `scripts/plan_to_events.py`：计划 `.md` → events JSON（导出链路的前置解析，以 `.md` 为唯一真源）。
 - `scripts/export_ics.py`：events JSON → `.ics` 日历导出。
 - `scripts/export_html.py`：events JSON → 独立 HTML 勾选清单（浏览器打开，无需额外软件，三件套子项作为可勾选框输出）。

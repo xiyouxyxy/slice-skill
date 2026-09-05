@@ -48,16 +48,21 @@
 | **③ .ics 日历** | `export_ics.py` → `xxx.ics` | 要导入手机/桌面日历、每天弹提醒 | 日历 App（苹果日历 / Google 日历 / Outlook）导入 |
 | **④ 纯清单** | 计划文件里的勾选表 | 想手抄 / 贴到别处 | 同 Markdown |
 
-脚本调用（`plan_to_events.py` 仅依赖 Python 标准库；先把 `.md` 解析成 events JSON，再以它为输入导出）：
+脚本调用（全部仅依赖 Python 标准库）：
 ```
-# .md → events JSON（导出前置步骤，.md 是唯一真源，不必手写第二份 JSON）
+# 1) 规划引擎：LLM 做完 WBS 的 spec JSON → 计划 .md（自动排程/缓冲/间隔复习）
+python scripts/generate_plan.py build --in spec.json --out plans/xxx.md [--start 2026-09-05]
+
+# 2) .md → events JSON（导出前置步骤，.md 是唯一真源，不必手写第二份 JSON）
 python scripts/plan_to_events.py --in plans/xxx.md --out plans/xxx-events.json
 
-# HTML 网页（带勾选框，浏览器打开）
+# 3a) HTML 网页（带勾选框，浏览器打开）；3b) .ics 日历（导入手机日历）
 python scripts/export_html.py --in plans/xxx-events.json --out xxx.html --name "我的计划"
+python scripts/export_ics.py  --in plans/xxx-events.json --out xxx.ics
 
-# .ics 日历（导入手机日历）
-python scripts/export_ics.py --in plans/xxx-events.json --out xxx.ics
+# 落后自动重排（Step 9.2）：把未完成且已过期的任务顺延到最近可用日
+python scripts/generate_plan.py reschedule --in plans/xxx.md --today 2026-09-20 \
+    --done 2026-09-05,2026-09-06 --out plans/xxx-resched.md
 ```
 
 > 推荐给电脑端用户的路径：选 **Markdown 或 HTML** 即可，无需折腾日历 App。
@@ -70,12 +75,13 @@ slice/
 │   ├── plan-template.md  # 计划文件标准格式
 │   └── examples.md       # 三类场景完整示例
 └── scripts/
+    ├── generate_plan.py  # 规划引擎：spec JSON → 计划 .md（build）+ 落后重排（reschedule）
     ├── plan_to_events.py # 计划 .md → events JSON（导出链路前置解析，.md 为唯一真源）
     ├── export_ics.py     # events JSON → .ics 日历导出
     └── export_html.py    # events JSON → HTML 网页（带勾选框、可打印）
 ```
 
-> 说明：导出链路已确定性化（`.md` → `plan_to_events.py` → `export_*.py`）。排程 / 落后重排逻辑目前仍由 `SKILL.md` 工作流驱动（AI 现推）；如需确定性、可复现的排程引擎，可后续把排程算法提取为 `scripts/` 下的正式脚本。
+> 说明：**整条链路已确定性化**——`generate_plan.py` 负责按文档 Step 5/6/7 把 spec 渲染成 `.md`（排程、缓冲、+1/+3/+7 间隔复习、可用日过滤全由脚本算），`plan_to_events.py` → `export_*.py` 负责导出，重排由 `generate_plan.py reschedule` 完成。WBS（定里程碑/任务/三件套）仍是 LLM 的语义活，由 spec JSON 输入引擎。
 
 ## License
 MIT — 见 [LICENSE](LICENSE)。
