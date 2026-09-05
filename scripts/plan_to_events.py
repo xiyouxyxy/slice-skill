@@ -31,7 +31,7 @@ _HEADER_RE = re.compile(
     r"^###\s+(\d{4}-\d{2}-\d{2})\s+周[一二三四五六日]\s*·\s*(.+?)\s*(?:\[([^\]]*)\])?\s*$"
 )
 # Section start inside a card: "- **子目标**（...）：" etc.
-_SECTION_RE = re.compile(r"^\s*-\s*\*\*(子目标|验收|口述自检|状态)\*\*")
+_SECTION_RE = re.compile(r"^\s*-\s*\*\*(子目标|验收|口述自检|状态|复习指向)\*\*")
 # Bullet inside a section; captures the [ ] / [x] marker so we keep checkbox state.
 _BULLET_RE = re.compile(r"^\s*[-*]\s*(?:\[([ xX])\]\s*)?(.*)$")
 # Status glyph on the "**状态**：⬜ → 🟡 → ✅" line.
@@ -80,6 +80,7 @@ def parse_plan(text: str):
                 "accept_done": [],
                 "recite_done": [],
                 "status": "",
+                "review_src": [],
             }
             section = None
             continue
@@ -94,6 +95,13 @@ def parse_plan(text: str):
                 gm = _STATUS_GLYPH_RE.search(line)
                 if gm:
                     current["status"] = gm.group(0)
+            elif section == "复习指向":
+                # 同一行末尾列出被复习覆盖的原始任务，用 " / " 分隔，去掉括号注记与冒号
+                after = line[s.end():]
+                after = re.sub(r"^（[^）]*）\s*", "", after.strip())
+                after = re.sub(r"^\s*[:：]\s*", "", after)
+                parts = [p.strip().strip("（）()") for p in after.split("/") if p.strip()]
+                current["review_src"] = parts
             continue
 
         if section in ("子目标", "验收", "口述自检"):

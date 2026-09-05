@@ -154,6 +154,7 @@ def _buffer_item() -> dict:
 
 def _milestone_review(mname: str, mi: int, tasks: list) -> dict:
     # 从本里程碑任务里挑验收题，自动生成复习卡（无需 LLM 额外输入）
+    task_titles = [t.get("title", f"任务{i + 1}") for i, t in enumerate(tasks)]
     accepts = []
     for t in tasks:
         for a in t.get("accept", [])[:2]:
@@ -173,6 +174,8 @@ def _milestone_review(mname: str, mi: int, tasks: list) -> dict:
         "recite": recite,
         "milestone": mname,
         "milestone_idx": mi,
+        # 动态指回本里程碑覆盖的原始任务（而非写死）
+        "review_src": task_titles,
     }
 
 
@@ -187,6 +190,8 @@ def _global_review(upto_idx: int, span: int, milestones: list) -> dict:
         "recite": [f"口述『{covered[-1]} 与 {covered[0]} 的关系』"],
         "milestone": "",
         "milestone_idx": -1,
+        # 动态指回覆盖到的里程碑（而非写死）
+        "review_src": covered,
     }
 
 
@@ -374,6 +379,9 @@ def _render_card(it: dict) -> str:
     lines.append("- **口述自检**（不查资料，能讲清就勾）：")
     for r in it.get("recite", []) or ["（无）"]:
         lines.append(f"  - [ ] {r}")
+    src = it.get("review_src")
+    if src:
+        lines.append("- **复习指向**（回到这些原始任务）：" + " / ".join(str(x) for x in src))
     lines.append("- **状态**：⬜ → 🟡 → ✅（全勾后改 ✅）")
     return "\n".join(lines)
 

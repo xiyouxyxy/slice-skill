@@ -20,7 +20,8 @@ The JSON is an array of events. Each event supports two schemas:
       "sub_done": [...],        # 与 sub 对齐的勾选状态（来自 .md 的 - [x]）
       "accept_done": [...],     # 与 accept 对齐
       "recite_done": [...],     # 与 recite 对齐
-      "status": "✅"            # 卡片状态行（⬜/🟡/✅/⏭），可选
+      "status": "✅",           # 卡片状态行（⬜/🟡/✅/⏭），可选
+      "review_src": [...]       # 复习卡"复习指向"——动态指回的原始任务/里程碑
     }
 
 状态源统一（P2）设计要点
@@ -34,7 +35,15 @@ The JSON is an array of events. Each event supports two schemas:
   改写（如 AI 打卡回写），**以 .md 烘焙的真值覆盖过期浏览器勾选**。版本相符
   时则沿用浏览器勾选（用户离线补勾的进度不丢）。
 - 回写：本页「导出回写指令」按钮产出一份 JSON（按 date+title 定位卡片、列出
-  各三件套勾选布尔），交给 AI 即可写回 `.md`（把对应 `- [ ]` / `- [x]` 翻转）。
+  各三件套勾选布尔 + 口述文字答案），交给 AI 即可写回 `.md`。
+
+P3 增强
+------
+- 口述自检每项附一个**可编辑 textarea**，存用户自己的口述答案；内容持久化到
+  localStorage（跨版本保留，因为答案属于用户而非 .md 真源），并在「导出回写指令」
+  JSON 的 `recite_text` 中一同导出。
+- 复习卡渲染 `review_src`（**复习指向**），动态指回它覆盖的原始任务/里程碑，
+  而不是写死的泛化文案。
 
 只有 Python 标准库被使用。输出文件任意浏览器可开。
 """
@@ -74,27 +83,39 @@ def _base_id(ev: dict, d: str) -> str:
     return f"{d}-{abs(hash(json.dumps(ev, ensure_ascii=False, sort_keys=True))) % 100000}"
 
 
-def _piece(label: str, items, done, base_id: str, piece_key: str) -> str:
-    """Render a labeled nested checkbox group with .md-derived checked state."""
+def _piece(label: str, items, done, base_id: str, piece_key: str, texts=None) -> str:
+    """Render a labeled nested checkbox group with .md-derived checked state.
+
+    For the 口述自检 piece, each item also gets an editable textarea so the
+    user can store their own oral answer (P3).
+    """
     if not items:
         return ""
     if not done:
         done = []
     lines = [f'<div class="piece"><div class="piece-label">{_esc(label)}</div><ul class="piece-list">']
     for i, it in enumerate(items):
-        cid = f"{base_id}-{label}-{i}"
+        cid = f"{base_id}-{piece_key}-{i}"
         checked = " checked" if (i < len(done) and done[i]) else ""
+        text_html = ""
+        if piece_key == "recite":
+            tid = f"{cid}-text"
+            val = _esc(texts[i]) if texts and i < len(texts) and texts[i] else ""
+            text_html = (
+                f"<textarea class='recite-text' id='{tid}' data-for='{cid}' "
+                f"placeholder='在此写下你的口述答案（可选）'>{val}</textarea>"
+            )
         lines.append(
             f"<li><input type='checkbox' class='ev-sub' id='{cid}' "
             f"data-piece='{piece_key}' data-idx='{i}'{checked}>"
-            f"<label for='{cid}'>{_esc(it)}</label></li>"
+            f"<label for='{cid}'>{_esc(it)}</label>{text_html}</li>"
         )
     lines.append("</ul></div>")
     return "\n".join(lines)
 
 
 def _event_block(ev, base_id: str) -> str:
-    """Render one event: title row + (optional) three nested pieces."""
+    """Render one event: title row + (optional) three nested pieces + review pointer."""
     title = ev.get("title", "")
     kind = ev.get("kind", "")
     duration = ev.get("duration", "")
@@ -105,6 +126,8 @@ def _event_block(ev, base_id: str) -> str:
     sub_done = ev.get("sub_done") or []
     accept_done = ev.get("accept_done") or []
     recite_done = ev.get("recite_done") or []
+    recite_text = ev.get("recite_text") or []
+    review_src = ev.get("review_src") or []
     date = ev.get("date", "")
 
     badge_color = _KIND_COLOR.get(kind, "#656d76")
@@ -124,8 +147,12 @@ def _event_block(ev, base_id: str) -> str:
         body_parts.append('<div class="pieces">')
         body_parts.append(_piece("子目标", sub, sub_done, base_id, "sub"))
         body_parts.append(_piece("验收", accept, accept_done, base_id, "accept"))
-        body_parts.append(_piece("口述自检", recite, recite_done, base_id, "recite"))
+        body_parts.append(_piece("口述自检", recite, recite_done, base_id, "recite", recite_text))
         body_parts.append("</div>")
+    if review_src:
+        body_parts.append(
+            f'<div class="review-src">复习指向：{" / ".join(_esc(x) for x in review_src)}</div>'
+        )
     return (
         f"<div class='event' data-date='{_esc(date)}' data-title='{_esc(title)}'>"
         f"{head}{''.join(body_parts)}</div>"
@@ -187,9 +214,15 @@ h1{font-size:22px;margin-bottom:4px;}
 .piece-list li{margin:3px 0;font-size:13px;}
 .piece-list input{margin-right:6px;}
 input[type=checkbox]{transform:translateY(1px);}
+.recite-text{display:block;width:96%;margin:4px 0 6px 26px;font:inherit;font-size:12.5px;padding:5px 7px;
+  border:1px solid #d0d7de;border-radius:4px;box-sizing:border-box;resize:vertical;min-height:34px;color:#1f2328;}
+.recite-text:focus{outline:none;border-color:#8250df;}
+.review-src{margin:6px 0 6px 22px;font-size:12.5px;color:#8250df;background:#faf5ff;border-left:3px solid #8250df;
+  padding:5px 9px;border-radius:4px;}
 .desc{color:#57606a;font-size:13px;margin-left:24px;}
 footer{margin-top:30px;color:#8b949e;font-size:12px;border-top:1px solid #d0d7de;padding-top:10px;}
-@media print{body{margin:0;} .noprint{display:none;} .day{break-inside:avoid;} .bar{position:static;}}
+@media print{body{margin:0;} .noprint{display:none;} .day{break-inside:avoid;} .bar{position:static;}
+  .recite-text{display:none;} .review-src{background:none;border-color:#8250df;}}
 """.strip()
     p = []
     p.append("<!DOCTYPE html>")
@@ -204,7 +237,8 @@ footer{margin-top:30px;color:#8b949e;font-size:12px;border-top:1px solid #d0d7de
     )
     p.append(
         '<div class="banner noprint">本页勾选仅存于本机浏览器；<b>唯一真源是 '
-        '<code>.md</code> 计划文件</b>。想让进度正式生效，用「导出回写指令」交给 AI 写回 .md。</div>'
+        '<code>.md</code> 计划文件</b>。想让进度正式生效，用「导出回写指令」交给 AI 写回 .md。'
+        '口述自检框下的文本框可随手记下自己的口述答案，仅保存在本机。</div>'
     )
     p.append(
         '<div class="bar noprint">'
@@ -226,6 +260,7 @@ footer{margin-top:30px;color:#8b949e;font-size:12px;border-top:1px solid #d0d7de
         p.append("</div>")
     p.append('<footer class="noprint">唯一真源是 <code>.md</code> 计划文件；本页勾选是离线副本。'
              'header 勾选框在该任务下所有子项都勾上后自动打勾；✅ 表示三件套（子目标/验收/口述）全过。'
+             '口述自检下方的文本框可记录你的口述答案（仅本机保存）。'
              '按 Ctrl/Cmd+P 可打印。担心浏览器不保存时，用「导出进度」备份为 JSON；'
              '想让进度生效，用「导出回写指令」交给 AI 写回 .md。</footer>')
     p.append(f"<script>window.__SLICE_EVENTS__ = {json.dumps(meta_list, ensure_ascii=False)};</script>")
@@ -245,8 +280,11 @@ _SCRIPT = """
   var PLAN_VERSION = '{{PLAN_VERSION}}';
   var PLAN_TITLE = '{{PLAN_TITLE}}';
   var VER_KEY = PLAN_KEY + ':v';
+  var TEXT_PREFIX = PLAN_KEY + ':text:';
   function loadState(){ try{ return JSON.parse(localStorage.getItem(PLAN_KEY)) || {}; }catch(e){ return {}; } }
   function saveState(s){ try{ localStorage.setItem(PLAN_KEY, JSON.stringify(s)); localStorage.setItem(VER_KEY, PLAN_VERSION); }catch(e){} }
+  function loadText(id){ try{ return localStorage.getItem(TEXT_PREFIX + id) || ''; }catch(e){ return ''; } }
+  function saveText(id, val){ try{ if(val){ localStorage.setItem(TEXT_PREFIX + id, val); } else { localStorage.removeItem(TEXT_PREFIX + id); } }catch(e){} }
   var storedVersion = (function(){ try{ return localStorage.getItem(VER_KEY); }catch(e){ return null; } })();
   var useStored = (storedVersion === PLAN_VERSION);
   var state = useStored ? loadState() : {};
@@ -276,6 +314,10 @@ _SCRIPT = """
     events.forEach(refreshEvent);
     updateProgress();
   }
+  // 还原口述文本框（用户自己的答案，独立于勾选状态，跨版本保留）
+  function restoreTexts(){
+    document.querySelectorAll('textarea.recite-text').forEach(function(t){ t.value = loadText(t.id); });
+  }
 
   if(useStored){
     // 版本相符：沿用浏览器离线勾选（用户补勾的进度不丢）
@@ -290,6 +332,7 @@ _SCRIPT = """
     }
     saveState(state);
   }
+  restoreTexts();
 
   document.querySelectorAll('input[type=checkbox]').forEach(function(b){
     b.addEventListener('change', function(){
@@ -303,10 +346,18 @@ _SCRIPT = """
       updateProgress();
     });
   });
+  document.querySelectorAll('textarea.recite-text').forEach(function(t){
+    t.addEventListener('input', function(){ saveText(t.id, t.value); });
+  });
 
-  // 导出进度（localStorage 便携备份）
+  // 导出进度（localStorage 便携备份，含勾选 + 口述文字）
+  function collectTexts(){
+    var m = {};
+    document.querySelectorAll('textarea.recite-text').forEach(function(t){ if(t.value) m[t.id] = t.value; });
+    return m;
+  }
   document.getElementById('exportBtn').addEventListener('click', function(){
-    var data = { key: PLAN_KEY, version: PLAN_VERSION, state: state, exportedAt: new Date().toISOString() };
+    var data = { key: PLAN_KEY, version: PLAN_VERSION, state: state, texts: collectTexts(), exportedAt: new Date().toISOString() };
     var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = 'slice-progress.json'; a.click();
@@ -320,15 +371,21 @@ _SCRIPT = """
     r.onload = function(){
       try{
         var data = JSON.parse(r.result);
-        if(data && data.state){ state = data.state; saveState(state); applyState(); }
-        else { alert('导入失败：未找到进度数据'); }
+        if(data && data.state){
+          state = data.state;
+          if(data.texts){ for(var k in data.texts){ saveText(k, data.texts[k]); } }
+          saveState(state); applyState(); restoreTexts();
+        } else { alert('导入失败：未找到进度数据'); }
       }catch(e){ alert('导入失败：文件格式不正确'); }
     };
     r.readAsText(f);
     imp.value = '';
   });
   document.getElementById('resetBtn').addEventListener('click', function(){
-    if(confirm('确定清空所有勾选状态？此操作不可撤销。')){ state = {}; saveState(state); applyState(); }
+    if(confirm('确定清空所有勾选状态与口述文本？此操作不可撤销。')){
+      state = {}; saveState(state); applyState();
+      document.querySelectorAll('textarea.recite-text').forEach(function(t){ t.value=''; saveText(t.id,''); });
+    }
   });
 
   // 导出回写指令：产出可交给 AI 写回 .md 的 JSON（按 date+title 定位卡片）
@@ -336,14 +393,15 @@ _SCRIPT = """
     var meta = window.__SLICE_EVENTS__ || [];
     var cards = events.map(function(ev, idx){
       var m = meta[idx] || {date:'', title:''};
-      var sub=[], accept=[], recite=[];
+      var sub=[], accept=[], recite=[], recite_text=[];
       ev.querySelectorAll('input.ev-sub').forEach(function(b){
         var p = b.getAttribute('data-piece');
         if(p==='sub') sub.push(b.checked);
         else if(p==='accept') accept.push(b.checked);
         else if(p==='recite') recite.push(b.checked);
       });
-      return {date: m.date, title: m.title, sub: sub, accept: accept, recite: recite};
+      ev.querySelectorAll('textarea.recite-text').forEach(function(t){ recite_text.push(t.value); });
+      return {date: m.date, title: m.title, sub: sub, accept: accept, recite: recite, recite_text: recite_text};
     });
     var data = { slice_flush: 1, title: PLAN_TITLE, version: PLAN_VERSION, cards: cards };
     var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
