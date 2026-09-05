@@ -32,7 +32,10 @@ _HEADER_RE = re.compile(
 )
 # Section start inside a card: "- **子目标**（...）：" etc.
 _SECTION_RE = re.compile(r"^\s*-\s*\*\*(子目标|验收|口述自检|状态)\*\*")
-_BULLET_RE = re.compile(r"^\s*[-*]\s*(?:\[[ xX]\]\s*)?(.*)$")
+# Bullet inside a section; captures the [ ] / [x] marker so we keep checkbox state.
+_BULLET_RE = re.compile(r"^\s*[-*]\s*(?:\[([ xX])\]\s*)?(.*)$")
+# Status glyph on the "**状态**：⬜ → 🟡 → ✅" line.
+_STATUS_GLYPH_RE = re.compile(r"[⬜🟡✅⏭]")
 
 _KIND_KEYWORDS = [
     ("复习", "复习"),
@@ -73,6 +76,10 @@ def parse_plan(text: str):
                 "sub": [],
                 "accept": [],
                 "recite": [],
+                "sub_done": [],
+                "accept_done": [],
+                "recite_done": [],
+                "status": "",
             }
             section = None
             continue
@@ -83,15 +90,20 @@ def parse_plan(text: str):
         s = _SECTION_RE.match(line)
         if s:
             section = s.group(1)
+            if section == "状态":
+                gm = _STATUS_GLYPH_RE.search(line)
+                if gm:
+                    current["status"] = gm.group(0)
             continue
 
         if section in ("子目标", "验收", "口述自检"):
             b = _BULLET_RE.match(line)
             if b:
-                item = b.group(1).strip()
+                marker, item = b.group(1), b.group(2).strip()
                 if item:
                     key = {"子目标": "sub", "验收": "accept", "口述自检": "recite"}[section]
                     current[key].append(item)
+                    current[key + "_done"].append(marker in ("x", "X"))
 
     flush(current)
     return events

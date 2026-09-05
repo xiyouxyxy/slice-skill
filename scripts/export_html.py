@@ -14,24 +14,32 @@ The JSON is an array of events. Each event supports two schemas:
       "title": "M1: Python 语法回顾",
       "kind": "新内容",         # optional
       "duration": "1.0h",       # optional
-      "sub": [...],              # 子目标 (optional)
-      "accept": [...],           # 验收 (optional)
-      "recite": [...]            # 口述自检 (optional)
+      "sub": [...],             # 子目标 (optional)
+      "accept": [...],          # 验收 (optional)
+      "recite": [...],          # 口述自检 (optional)
+      "sub_done": [...],        # 与 sub 对齐的勾选状态（来自 .md 的 - [x]）
+      "accept_done": [...],     # 与 accept 对齐
+      "recite_done": [...],     # 与 recite 对齐
+      "status": "✅"            # 卡片状态行（⬜/🟡/✅/⏭），可选
     }
 
-When the three-piece fields are present, the HTML renders them as nested
-checkboxes so the user can tick off each piece individually. A task's
-header checkbox auto-completes when every piece under it is checked.
+状态源统一（P2）设计要点
+------------------------
+- **`.md` 计划文件是唯一真源**。`.md` 里 `- [x]` 的勾选与 `**状态**` 行由
+  `plan_to_events.py` 解析进 events JSON 的 `*_done` / `status` 字段，本脚本
+  把它们**烘焙进 HTML 的默认勾选状态**。
+- 浏览器 `localStorage` 只是离线工作副本：用户在本页勾选会写入它。
+- 版本号机制：每次重新生成 HTML 会按 events 内容算一个 `plan_version` 并写入
+  页面。打开页面时若发现 `localStorage` 里的版本与当前不符 → 说明 `.md` 已被
+  改写（如 AI 打卡回写），**以 .md 烘焙的真值覆盖过期浏览器勾选**。版本相符
+  时则沿用浏览器勾选（用户离线补勾的进度不丢）。
+- 回写：本页「导出回写指令」按钮产出一份 JSON（按 date+title 定位卡片、列出
+  各三件套勾选布尔），交给 AI 即可写回 `.md`（把对应 `- [ ]` / `- [x]` 翻转）。
 
-Checkbox state is persisted in the browser's localStorage so ticks survive
-closing / reopening the file. A plan-scoped key (derived from title + date
-span) keeps state stable even if the file is renamed or moved. There is also
-an export / import button as a portable backup (useful when file:// localStorage
-is restricted by the browser).
-
-Only the Python standard library is used. Output opens in any browser.
+只有 Python 标准库被使用。输出文件任意浏览器可开。
 """
 import argparse
+import hashlib
 import html
 import json
 from datetime import datetime
@@ -66,15 +74,19 @@ def _base_id(ev: dict, d: str) -> str:
     return f"{d}-{abs(hash(json.dumps(ev, ensure_ascii=False, sort_keys=True))) % 100000}"
 
 
-def _piece(label: str, items, base_id: str) -> str:
-    """Render a labeled nested checkbox group: 'label' with N items."""
+def _piece(label: str, items, done, base_id: str, piece_key: str) -> str:
+    """Render a labeled nested checkbox group with .md-derived checked state."""
     if not items:
         return ""
+    if not done:
+        done = []
     lines = [f'<div class="piece"><div class="piece-label">{_esc(label)}</div><ul class="piece-list">']
     for i, it in enumerate(items):
         cid = f"{base_id}-{label}-{i}"
+        checked = " checked" if (i < len(done) and done[i]) else ""
         lines.append(
-            f"<li><input type='checkbox' class='ev-sub' id='{cid}'>"
+            f"<li><input type='checkbox' class='ev-sub' id='{cid}' "
+            f"data-piece='{piece_key}' data-idx='{i}'{checked}>"
             f"<label for='{cid}'>{_esc(it)}</label></li>"
         )
     lines.append("</ul></div>")
@@ -90,6 +102,10 @@ def _event_block(ev, base_id: str) -> str:
     sub = ev.get("sub") or []
     accept = ev.get("accept") or []
     recite = ev.get("recite") or []
+    sub_done = ev.get("sub_done") or []
+    accept_done = ev.get("accept_done") or []
+    recite_done = ev.get("recite_done") or []
+    date = ev.get("date", "")
 
     badge_color = _KIND_COLOR.get(kind, "#656d76")
     badge = f'<span class="kind" style="background:{badge_color}">{_esc(kind)}</span>' if kind else ""
@@ -106,11 +122,14 @@ def _event_block(ev, base_id: str) -> str:
         body_parts.append(f'<div class="desc">{_esc(desc)}</div>')
     if sub or accept or recite:
         body_parts.append('<div class="pieces">')
-        body_parts.append(_piece("子目标", sub, base_id))
-        body_parts.append(_piece("验收", accept, base_id))
-        body_parts.append(_piece("口述自检", recite, base_id))
+        body_parts.append(_piece("子目标", sub, sub_done, base_id, "sub"))
+        body_parts.append(_piece("验收", accept, accept_done, base_id, "accept"))
+        body_parts.append(_piece("口述自检", recite, recite_done, base_id, "recite"))
         body_parts.append("</div>")
-    return f"<div class='event'>{head}{''.join(body_parts)}</div>"
+    return (
+        f"<div class='event' data-date='{_esc(date)}' data-title='{_esc(title)}'>"
+        f"{head}{''.join(body_parts)}</div>"
+    )
 
 
 def _plan_key(events, title: str) -> str:
@@ -121,17 +140,38 @@ def _plan_key(events, title: str) -> str:
     return f"{title}|{len(events)}|{first}|{last}"
 
 
+def _plan_version(events) -> str:
+    """Hash of the events content — changes whenever the .md (source) changes."""
+    payload = json.dumps(events, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
 def build_html(events, title: str = "Slice Plan") -> str:
     days = _group(events)
     plan_key = _plan_key(events, title)
+    plan_version = _plan_version(events)
+    meta_list = [
+        {
+            "date": ev.get("date", ""),
+            "title": ev.get("title", ""),
+            "sub_n": len(ev.get("sub") or []),
+            "accept_n": len(ev.get("accept") or []),
+            "recite_n": len(ev.get("recite") or []),
+        }
+        for ev in events
+    ]
     css = """
 body{font-family:-apple-system,'Segoe UI',Roboto,'Microsoft YaHei',sans-serif;max-width:780px;margin:24px auto;padding:0 16px;color:#1f2328;line-height:1.55;}
 h1{font-size:22px;margin-bottom:4px;}
 .meta{color:#656d76;font-size:13px;margin-bottom:8px;}
+.banner{background:#fff8e6;border:1px solid #f0d58c;border-left:3px solid #bf8700;color:#7a5b00;
+  font-size:12.5px;padding:7px 11px;border-radius:5px;margin:6px 0 10px;}
+.banner code{background:#f3e9cf;padding:1px 5px;border-radius:3px;}
 .bar{position:sticky;top:0;background:#fff;border:1px solid #d0d7de;border-radius:6px;padding:8px 12px;margin:6px 0 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,.06);}
 #progress{font-weight:600;font-size:14px;}
 .bar button{font:inherit;font-size:12px;padding:4px 10px;border:1px solid #d0d7de;border-radius:5px;background:#f6f8fa;cursor:pointer;}
 .bar button:hover{background:#eaeef2;}
+#srcNote{color:#8250df;font-size:12px;}
 .day{margin:18px 0;padding:10px 12px;background:#f6f8fa;border-radius:6px;}
 .date{font-weight:600;font-size:15px;border-left:3px solid #2da44e;padding-left:8px;margin-bottom:8px;}
 .event{margin:8px 0;padding:6px 8px;border-radius:5px;}
@@ -163,11 +203,17 @@ footer{margin-top:30px;color:#8b949e;font-size:12px;border-top:1px solid #d0d7de
         f'{datetime.now().strftime("%Y-%m-%d %H:%M")} · 由 slice skill 生成</div>'
     )
     p.append(
+        '<div class="banner noprint">本页勾选仅存于本机浏览器；<b>唯一真源是 '
+        '<code>.md</code> 计划文件</b>。想让进度正式生效，用「导出回写指令」交给 AI 写回 .md。</div>'
+    )
+    p.append(
         '<div class="bar noprint">'
         '<span id="progress">已完成 0 / 0 任务</span>'
+        '<button id="flushBtn" type="button">导出回写指令</button>'
         '<button id="exportBtn" type="button">导出进度</button>'
         '<button id="importBtn" type="button">导入进度</button>'
         '<button id="resetBtn" type="button">重置</button>'
+        '<span id="srcNote"></span>'
         '<input type="file" id="importFile" accept=".json" style="display:none">'
         "</div>"
     )
@@ -178,10 +224,16 @@ footer{margin-top:30px;color:#8b949e;font-size:12px;border-top:1px solid #d0d7de
         for ev in items:
             p.append(_event_block(ev, _base_id(ev, d)))
         p.append("</div>")
-    p.append('<footer class="noprint">勾选完成的任务会自动保存到本机浏览器（localStorage）。'
+    p.append('<footer class="noprint">唯一真源是 <code>.md</code> 计划文件；本页勾选是离线副本。'
              'header 勾选框在该任务下所有子项都勾上后自动打勾；✅ 表示三件套（子目标/验收/口述）全过。'
-             '按 Ctrl/Cmd+P 可打印。担心浏览器不保存时，用「导出进度」备份为 JSON。</footer>')
-    p.append(_SCRIPT.replace("{{PLAN_KEY}}", _esc(plan_key)))
+             '按 Ctrl/Cmd+P 可打印。担心浏览器不保存时，用「导出进度」备份为 JSON；'
+             '想让进度生效，用「导出回写指令」交给 AI 写回 .md。</footer>')
+    p.append(f"<script>window.__SLICE_EVENTS__ = {json.dumps(meta_list, ensure_ascii=False)};</script>")
+    p.append(
+        _SCRIPT.replace("{{PLAN_KEY}}", _esc(plan_key))
+        .replace("{{PLAN_VERSION}}", _esc(plan_version))
+        .replace("{{PLAN_TITLE}}", _esc(title))
+    )
     p.append("</body></html>")
     return "\n".join(p)
 
@@ -190,9 +242,14 @@ _SCRIPT = """
 <script>
 (function(){
   var PLAN_KEY = 'slice-plan-state:{{PLAN_KEY}}';
-  function load(){ try{ return JSON.parse(localStorage.getItem(PLAN_KEY)) || {}; }catch(e){ return {}; } }
-  function save(map){ try{ localStorage.setItem(PLAN_KEY, JSON.stringify(map)); }catch(e){} }
-  var state = load();
+  var PLAN_VERSION = '{{PLAN_VERSION}}';
+  var PLAN_TITLE = '{{PLAN_TITLE}}';
+  var VER_KEY = PLAN_KEY + ':v';
+  function loadState(){ try{ return JSON.parse(localStorage.getItem(PLAN_KEY)) || {}; }catch(e){ return {}; } }
+  function saveState(s){ try{ localStorage.setItem(PLAN_KEY, JSON.stringify(s)); localStorage.setItem(VER_KEY, PLAN_VERSION); }catch(e){} }
+  var storedVersion = (function(){ try{ return localStorage.getItem(VER_KEY); }catch(e){ return null; } })();
+  var useStored = (storedVersion === PLAN_VERSION);
+  var state = useStored ? loadState() : {};
 
   var events = Array.prototype.slice.call(document.querySelectorAll('.event'));
   function subBoxesOf(ev){ return Array.prototype.slice.call(ev.querySelectorAll('input.ev-sub')); }
@@ -215,12 +272,24 @@ _SCRIPT = """
       + '（' + (total ? Math.round(done/total*100) : 0) + '%）';
   }
   function applyState(){
-    var all = document.querySelectorAll('input[type=checkbox]');
-    all.forEach(function(b){ b.checked = !!state[b.id]; });
+    document.querySelectorAll('input[type=checkbox]').forEach(function(b){ b.checked = !!state[b.id]; });
     events.forEach(refreshEvent);
     updateProgress();
   }
-  applyState();
+
+  if(useStored){
+    // 版本相符：沿用浏览器离线勾选（用户补勾的进度不丢）
+    applyState();
+  } else {
+    // 版本不符：.md 已被改写，以 HTML 里烘焙的 .md 真值为准，丢弃过期浏览器勾选
+    state = {};
+    document.querySelectorAll('input[type=checkbox]').forEach(function(b){ if(b.checked) state[b.id]=1; });
+    if(storedVersion !== null){
+      var n = document.getElementById('srcNote');
+      if(n) n.textContent = '已用 .md 最新状态覆盖旧浏览器勾选';
+    }
+    saveState(state);
+  }
 
   document.querySelectorAll('input[type=checkbox]').forEach(function(b){
     b.addEventListener('change', function(){
@@ -229,14 +298,15 @@ _SCRIPT = """
         subBoxesOf(ev).forEach(function(s){ s.checked = b.checked; if(b.checked){ state[s.id]=1; } else { delete state[s.id]; } });
       }
       if(b.checked){ state[b.id]=1; } else { delete state[b.id]; }
-      save(state);
+      saveState(state);
       if(ev) refreshEvent(ev);
       updateProgress();
     });
   });
 
+  // 导出进度（localStorage 便携备份）
   document.getElementById('exportBtn').addEventListener('click', function(){
-    var data = { key: PLAN_KEY, state: state, exportedAt: new Date().toISOString() };
+    var data = { key: PLAN_KEY, version: PLAN_VERSION, state: state, exportedAt: new Date().toISOString() };
     var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = 'slice-progress.json'; a.click();
@@ -250,7 +320,7 @@ _SCRIPT = """
     r.onload = function(){
       try{
         var data = JSON.parse(r.result);
-        if(data && data.state){ state = data.state; save(state); applyState(); }
+        if(data && data.state){ state = data.state; saveState(state); applyState(); }
         else { alert('导入失败：未找到进度数据'); }
       }catch(e){ alert('导入失败：文件格式不正确'); }
     };
@@ -258,7 +328,28 @@ _SCRIPT = """
     imp.value = '';
   });
   document.getElementById('resetBtn').addEventListener('click', function(){
-    if(confirm('确定清空所有勾选状态？此操作不可撤销。')){ state = {}; save(state); applyState(); }
+    if(confirm('确定清空所有勾选状态？此操作不可撤销。')){ state = {}; saveState(state); applyState(); }
+  });
+
+  // 导出回写指令：产出可交给 AI 写回 .md 的 JSON（按 date+title 定位卡片）
+  document.getElementById('flushBtn').addEventListener('click', function(){
+    var meta = window.__SLICE_EVENTS__ || [];
+    var cards = events.map(function(ev, idx){
+      var m = meta[idx] || {date:'', title:''};
+      var sub=[], accept=[], recite=[];
+      ev.querySelectorAll('input.ev-sub').forEach(function(b){
+        var p = b.getAttribute('data-piece');
+        if(p==='sub') sub.push(b.checked);
+        else if(p==='accept') accept.push(b.checked);
+        else if(p==='recite') recite.push(b.checked);
+      });
+      return {date: m.date, title: m.title, sub: sub, accept: accept, recite: recite};
+    });
+    var data = { slice_flush: 1, title: PLAN_TITLE, version: PLAN_VERSION, cards: cards };
+    var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'slice-flush.json'; a.click();
+    URL.revokeObjectURL(a.href);
   });
 })();
 </script>
