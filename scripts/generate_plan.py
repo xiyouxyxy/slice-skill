@@ -96,6 +96,9 @@ ARCHETYPE_PROFILE = {
         "review_accept": "复盘本阶段错题（{items}）并补 1 套同等难度新题",
         "review_std": "正确率不低于首次 / 达到目标分数段",
         "global_accept": "复盘错题本 + 补 1 套跨阶段新题",
+        # 轮做制：间隔拉长（>=30 天，答案印象已模糊）后二刷真题，检验真实内化
+        "revisit_accept": "二刷此前做过的整套真题（间隔已久，检验真实内化而非记答案）",
+        "revisit_std": "对比首刷，标出仍然做错的题并复盘失分原因",
         "buffer_accept": "整理错题本 / 补 1 组薄弱项专项练习",
         "buffer_recite": "讲清 1 道曾经的错题当时为什么错",
     },
@@ -362,13 +365,26 @@ def _milestone_review(mname: str, mi: int, tasks: list, archetype: str = "") -> 
 def _global_review(upto_idx: int, span: int, milestones: list, archetype: str = "") -> dict:
     prof = _profile(archetype)
     covered = [m.get("name", f"M{i + 1}") for i, m in enumerate(milestones[:upto_idx + 1])]
-    accept_txt = prof["global_accept"]
-    if prof["review_std"]:
-        accept_txt = f"{accept_txt}，{prof['review_std']}"
+    # 轮做制（应试型）：间隔 >= 30 天的复习改为"二刷真题"——答案印象已模糊，
+    # 重做才有诊断价值；短间隔仍用"复盘错题 + 换新题"（刚做过就重做是背答案）
+    revisit = prof.get("revisit_accept")
+    is_revisit = bool(revisit and span >= _REVISIT_MIN_SPAN)
+    if is_revisit:
+        accept_txt = revisit
+        std = prof.get("revisit_std") or prof["review_std"]
+        title = f"全局复习（+{span} 间隔，二刷真题，覆盖 {' / '.join(covered)}）"
+        duration = 2.0  # 二刷是重做整套真题，需要完整时段，而非 0.5h 快过
+    else:
+        accept_txt = prof["global_accept"]
+        std = prof["review_std"]
+        title = f"全局复习（+{span} 间隔，覆盖 {' / '.join(covered)}）"
+        duration = 0.5
+    if std:
+        accept_txt = f"{accept_txt}，{std}"
     return {
         "kind": "复习",
-        "title": f"全局复习（+{span} 间隔，覆盖 {' / '.join(covered)}）",
-        "duration": 0.5,
+        "title": title,
+        "duration": duration,
         "sub": [f"能串联 {(' / '.join(covered))} 的主线"],
         "accept": [accept_txt],
         "recite": [f"口述『{covered[-1]} 与 {covered[0]} 的关系』"],
@@ -384,6 +400,10 @@ def _global_review(upto_idx: int, span: int, milestones: list, archetype: str = 
 # ---------------------------------------------------------------------------
 # 任务量少于可用日超过该比例时，视为"时间太多"，自动铺满到截止日
 _SPREAD_THRESHOLD = 1.3
+
+# 间隔达到该天数（约 4 周）后，应试型复习从"复盘+新题"切换为"二刷真题"
+# （答案印象已模糊，重做才有诊断价值；刚做完就重做是背答案）
+_REVISIT_MIN_SPAN = 30
 
 
 def schedule(items: list, start: date, available_days: str, target_date=None,
@@ -493,7 +513,7 @@ def _spread_items(items: list, spec: dict, archetype: str, need: int, target: da
     if not milestones:
         return items, log
 
-    added_exams = added_reviews = added_drills = 0
+    added_exams = added_reviews = added_drills = added_revisits = 0
 
     # 1) 应试型：模考节点（固定在考前日期）
     if archetype == "exam":
@@ -511,6 +531,8 @@ def _spread_items(items: list, spec: dict, archetype: str, need: int, target: da
         if need <= 0:
             break
         out.append(_global_review(len(milestones) - 1, span, milestones, archetype))
+        if archetype == "exam" and span >= _REVISIT_MIN_SPAN:
+            added_revisits += 1
         added_reviews += 1
         need -= 1
 
@@ -525,7 +547,10 @@ def _spread_items(items: list, spec: dict, archetype: str, need: int, target: da
     if added_exams:
         log.append(f"插入 {added_exams} 次全真模考（考前 30 / 14 / 7 天，固定日期）")
     if added_reviews:
-        log.append(f"追加 {added_reviews} 个间隔复习轮次（+14 ~ +120 天，覆盖全部里程碑）")
+        line = f"追加 {added_reviews} 个间隔复习轮次（+14 ~ +120 天，覆盖全部里程碑）"
+        if added_revisits:
+            line += f"，其中 {added_revisits} 个间隔 ≥ {_REVISIT_MIN_SPAN} 天的是二刷真题轮次"
+        log.append(line)
     if added_drills:
         log.append(f"追加 {added_drills} 轮综合演练 / 专项补弱")
     if need > 0:
