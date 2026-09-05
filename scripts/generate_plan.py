@@ -95,6 +95,36 @@ def _fmt_duration(hours) -> str:
     return f"{h:g}h"
 
 
+def _to_hours(v):
+    """把 1 / 1.0 / "1h" / "0.5h" 统一解析成 float 小时；无法解析或非正返回 None。"""
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return float(v) if float(v) > 0 else None
+    s = str(v).strip().lower().rstrip("h").strip()
+    try:
+        h = float(s)
+    except (TypeError, ValueError):
+        return None
+    return h if h > 0 else None
+
+
+def _over_budget_items(sched: list, daily_h):
+    """返回时长超过每日预算的 (item, hours) 列表，按超出幅度降序。
+
+    步骤 3/5 承诺"每日时长决定任务颗粒度上限"，这里把该约束落地：
+    单任务时长超过预算即预警，提示拆分或提高投入。
+    """
+    if not daily_h or daily_h <= 0:
+        return []
+    over = []
+    for it in sched:
+        h = _to_hours(it.get("duration"))
+        if h is not None and h > daily_h + 1e-9:
+            over.append((it, h))
+    return sorted(over, key=lambda x: -x[1])
+
+
 # ---------------------------------------------------------------------------
 # 1. 把 spec 展开成有序的"日程项"列表（含自动生成的复习/缓冲）
 # ---------------------------------------------------------------------------
@@ -112,7 +142,7 @@ def build_items(spec: dict) -> list:
             kind = t.get("kind", "新内容") or "新内容"
             items.append({
                 "kind": kind,
-                "title": f"{mname}: {t.get('title', f'任务{ti + 1}')}",
+                "title": f"{mname} · {t.get('title', f'任务{ti + 1}')}",
                 "duration": t.get("duration"),
                 "sub": t.get("sub", []),
                 "accept": t.get("accept", []),
@@ -145,8 +175,8 @@ def _buffer_item() -> dict:
         "title": "缓冲日",
         "duration": None,
         "sub": ["不强求，做完三件套之一即可"],
-        "accept": ["任选之前学过的 1 个子目标重新讲一遍 / 重做 1 道题"],
-        "recite": ["任意 1 个旧难点的口述"],
+        "accept": ["任选之前的 1 个子目标重新过一遍 / 重做 1 个验收项"],
+        "recite": ["任意 1 个旧难点，用自己的话讲清"],
         "milestone": "",
         "milestone_idx": -1,
     }
@@ -168,9 +198,9 @@ def _milestone_review(mname: str, mi: int, tasks: list) -> dict:
         "kind": "复习",
         "title": f"复习 {mname} 全部（+1 间隔复习）",
         "duration": 0.5,
-        "sub": [f"能不看资料口述 {mname} 的核心点"],
-        "accept": [f"重做关键验收题（{(' / '.join(accepts)) if accepts else '本里程碑重点题'}），能跑通"]
-                  if accepts else ["重做本里程碑关键验收题，能跑通"],
+        "sub": [f"能不看资料说出 {mname} 的核心点"],
+        "accept": [f"重做关键验收项（{(' / '.join(accepts)) if accepts else '本里程碑重点项'}），达到首次同等标准"]
+                  if accepts else ["重做本里程碑关键验收项，达到首次同等标准"],
         "recite": recite,
         "milestone": mname,
         "milestone_idx": mi,
@@ -186,7 +216,7 @@ def _global_review(upto_idx: int, span: int, milestones: list) -> dict:
         "title": f"全局复习（+{span} 间隔，覆盖 {' / '.join(covered)}）",
         "duration": 0.5,
         "sub": [f"能串联 {(' / '.join(covered))} 的主线"],
-        "accept": ["重做此前任意 2 道验收题，能跑通"],
+        "accept": ["重做此前任意 2 个验收项，达到首次同等标准"],
         "recite": [f"口述『{covered[-1]} 与 {covered[0]} 的关系』"],
         "milestone": "",
         "milestone_idx": -1,
@@ -340,6 +370,16 @@ def render_md(spec: dict, sched: list, overload: bool) -> str:
         L.append("> ⚠️ **时间紧**：可用日不足以 1 任务/天摊开，已合并部分日期。建议延长截止日或提高每日投入。")
         L.append("")
 
+    over_budget = _over_budget_items(sched, _to_hours(daily))
+    if over_budget:
+        names = "、".join(f"{it['title']}（{_fmt_duration(h)}）" for it, h in over_budget[:3])
+        tail = f" 等共 {len(over_budget)} 个" if len(over_budget) > 3 else ""
+        L.append(
+            f"> ⚠️ **单任务超出每日预算**（{_fmt_duration(daily)}/天）：{names}{tail}。"
+            f"建议拆成连续几天的切片，或提高每日投入。"
+        )
+        L.append("")
+
     # 任务卡片
     L.append("## 任务卡片（详情：完成标准三件套）")
     L.append("")
@@ -381,7 +421,8 @@ def _render_card(it: dict) -> str:
         lines.append(f"  - [ ] {r}")
     src = it.get("review_src")
     if src:
-        lines.append("- **复习指向**（回到这些原始任务）：" + " / ".join(str(x) for x in src))
+        # 用全角竖线分隔：任务标题本身可能含 "/"（如"平涂/干笔/点彩"），用 "/" 会被误切
+        lines.append("- **复习指向**（回到这些原始任务）：" + " ｜ ".join(str(x) for x in src))
     lines.append("- **状态**：⬜ → 🟡 → ✅（全勾后改 ✅）")
     return "\n".join(lines)
 
@@ -438,6 +479,11 @@ def cmd_build(args):
     note = " ⚠️时间紧(已合并日期)" if overload else ""
     print(f"生成计划：{args.out}")
     print(f"  任务项 {len(sched)} 个，预计完成日 {finish}{note}")
+    over = _over_budget_items(sched, _to_hours(meta.get("daily_duration", 1.0)))
+    if over:
+        print(f"  ⚠️ {len(over)} 个任务超出每日预算 {_fmt_duration(meta.get('daily_duration', 1.0))}：")
+        for it, h in over:
+            print(f"     - {it['title']}（{_fmt_duration(h)}）")
 
 
 def cmd_reschedule(args):

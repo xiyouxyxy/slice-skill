@@ -96,11 +96,16 @@ def parse_plan(text: str):
                 if gm:
                     current["status"] = gm.group(0)
             elif section == "复习指向":
-                # 同一行末尾列出被复习覆盖的原始任务，用 " / " 分隔，去掉括号注记与冒号
+                # 同一行末尾列出被复习覆盖的原始任务，去掉括号注记与冒号后按分隔符切开
                 after = line[s.end():]
                 after = re.sub(r"^（[^）]*）\s*", "", after.strip())
                 after = re.sub(r"^\s*[:：]\s*", "", after)
-                parts = [p.strip().strip("（）()") for p in after.split("/") if p.strip()]
+                # 优先用全角竖线（任务标题本身可能含 "/"，如"平涂/干笔/点彩"）
+                # 检测不到时退化用 "/"，兼容此前已生成的旧计划文件
+                parts = after.split("｜")
+                if len(parts) == 1:
+                    parts = after.split("/")
+                parts = [p.strip().strip("（）()") for p in parts if p.strip()]
                 current["review_src"] = parts
             continue
 
